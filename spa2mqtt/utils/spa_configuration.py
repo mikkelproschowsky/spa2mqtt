@@ -16,8 +16,10 @@ def get_application_configuration(logger: logging.Logger, file: str = 'config.ym
             "SPA_IP": "192.168.1.1",
             "SPA_PORT": "8899",
             "VARIANT_DEFINITION": "jacuzzi_j335_unencrypted_farenheit",
-            "MQTT_BROKER": "192.168.1.7",
+            "MQTT_HOST": "192.168.1.7",
             "MQTT_PORT": "1883",
+            "MQTT_USERNAME": "",
+            "MQTT_PASSWORD": "",
         }
 
         # Check for any missing (unset or empty) environment variables
@@ -41,8 +43,10 @@ def get_application_configuration(logger: logging.Logger, file: str = 'config.ym
                 "model": "Default Model"
             },
             "mqtt": {
-                "broker": os.environ.get("MQTT_BROKER", env_defaults["MQTT_BROKER"]),
+                "host": os.environ.get("MQTT_HOST", env_defaults["MQTT_HOST"]),
                 "port": os.environ.get("MQTT_PORT", env_defaults["MQTT_PORT"]),
+                "username": os.environ.get("MQTT_USERNAME", env_defaults["MQTT_USERNAME"]),
+                "password": os.environ.get("MQTT_PASSWORD", env_defaults["MQTT_PASSWORD"]),
             }
         }
 

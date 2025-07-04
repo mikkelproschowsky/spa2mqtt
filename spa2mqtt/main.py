@@ -24,7 +24,8 @@ async def main():
     if debug_spa:
         mqtt = None
     else:
-        mqtt = MQTTControl(broker_host=mqtt_configuration.get('broker'), broker_port=mqtt_configuration.get('port'),
+        mqtt = MQTTControl(broker_host=mqtt_configuration.get('host'), broker_port=mqtt_configuration.get('port'),
+                           broker_username=mqtt_configuration.get('username'), broker_password=mqtt_configuration.get('password'),
                            sensor_update_intervals=tub_config.get('sensor_update_intervals', {}))
 
     communicator = get_communicator(

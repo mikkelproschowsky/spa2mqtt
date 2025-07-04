@@ -30,10 +30,18 @@ class MQTTControl:
     spa: Spa = None
 
     def __init__(self, sensor_update_intervals: dict = {}, logger: Logger = None, broker_host='localhost',
-                 broker_port=1883, device='Jacuzzi J235',
+                 broker_port=1883, broker_username=None, broker_password=None, device='Jacuzzi J235',
                  device_id='185569045'):
         self.sensor_update_intervals = sensor_update_intervals
-        self.mqtt_settings = Settings.MQTT(host=broker_host, port=broker_port)
+        
+        # Create MQTT settings with authentication if provided
+        mqtt_params = {'host': broker_host, 'port': broker_port}
+        if broker_username:
+            mqtt_params['username'] = broker_username
+        if broker_password:
+            mqtt_params['password'] = broker_password
+            
+        self.mqtt_settings = Settings.MQTT(**mqtt_params)
         self.device_name = device
         self.device_id = device_id
         self.logger = logger or logging.getLogger(f"{self.device_name}_MQTT")
