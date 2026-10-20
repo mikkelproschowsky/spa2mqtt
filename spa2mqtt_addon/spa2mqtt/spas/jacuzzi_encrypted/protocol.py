@@ -28,7 +28,7 @@ CLIENT_MID = 0xBF
 DORMANT_CONFIDENCE = 40          # CC_REQ packets observed before picking a dormant channel
 PRESS_SETTLE_S = 4.0             # how long to wait for a press to show up in the status
 MAX_PRESSES_WITHOUT_EFFECT = 6
-SETPOINT_MIN, SETPOINT_MAX, SETPOINT_STEP = 10.0, 40.0, 0.5
+SETPOINT_MIN, SETPOINT_MAX, SETPOINT_STEP = 18.5, 40.0, 0.5  # J235: measured 2026-10-20 (it stops at 18.5 °C)
 
 
 class JacuzziProtocol:

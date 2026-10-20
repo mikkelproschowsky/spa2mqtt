@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.0.2
+- Setpoint range 18.5–40 °C (the J235 does not go lower; measured).
+
 ## 1.0.1
 - run.sh uses `with-contenv` (the base image runs s6; without it the script had no Supervisor token and could not read options or the MQTT service).
 

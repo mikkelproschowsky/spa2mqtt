@@ -16,7 +16,7 @@ gateway (EW11A, TCP server on port 8899). Runs entirely on Home Assistant: it us
 
 ## Entities (device "Jacuzzi")
 
-- `climate.jacuzzi_spa` – water temperature and setpoint (10–40 °C, 0.5 °C steps)
+- `climate.jacuzzi_spa` – water temperature and setpoint (18.5–40 °C on the J235, 0.5 °C steps)
 - `sensor.jacuzzi_water_temperature`, `sensor.jacuzzi_target_temperature`, `number.jacuzzi_target_temperature`
 - `binary_sensor.jacuzzi_circulation_pump`, `_pump_1`, `_pump_2`, `binary_sensor.jacuzzi_connected`
 - `button.jacuzzi_pump_1`, `_pump_2`, `_temperature_up`, `_temperature_down`
