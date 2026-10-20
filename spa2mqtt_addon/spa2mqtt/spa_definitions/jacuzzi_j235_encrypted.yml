@@ -28,54 +28,25 @@ message_configuration:
         device_class: temperature
       offset: 8
       scale: 0.5 # This will vary if we're in F or C - if C, 0.5 else you can omit or set to 1
-    - name: circulation_pump_status
-      type: binary_sensor
-      home_assistant:
-        name: Circulation Pump Status
-        icon: mdi:water-pump
-        entity_category: diagnostic
-        device_class: running
-      offset: 1
-      shift: 6
+    # Measured 2026-10-20 (button presses + bus capture, see CHANGELOG 1.0.4):
+    #   byte 2 bit 3 = pump 1 low speed (circulation), byte 2 bit 4 = pump 1 high, byte 1 bit 2 = pump 2,
+    #   byte 10 bit 6 = heater on (matches the Shelly on the heater phase). Byte 1 bit 6 blinks (panel LED) – not a pump.
+    - name: pump_1_low
+      offset: 2
+      shift: 3
       mask: 1
-#
-
-
-#    - name: clearray_status
-#      type: binary_sensor
-#      home_assistant:
-#        name: Clearray Status
-#        icon: mdi:lightbulb-cfl
-#        entity_category: diagnostic
-#        device_class: running
-#      offset: 7
-#      shift: 6
-#      mask: 0xc0
-
-#
-    - name: secondary_pump_status
-      type: binary_sensor
-      home_assistant:
-        name: Secondary Pump Status
-        icon: mdi:water-pump
-        entity_category: diagnostic
-        device_class: running
-      offset: 1
-      shift: 2
-      mask: 1 # This is possibly not necessary in this particular operation
-#
-#
-    - name: main_pump_status
-      type: binary_sensor
-      home_assistant:
-        name: Main Pump Status
-        icon: mdi:water-pump
-        entity_category: diagnostic
-        device_class: running
+    - name: pump_1_high
       offset: 2
       shift: 4
       mask: 1
-
+    - name: pump_2
+      offset: 1
+      shift: 2
+      mask: 1
+    - name: heater
+      offset: 10
+      shift: 6
+      mask: 1
 
 #    - name: water_life_remaining
 #      home_assistant:

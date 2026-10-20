@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.4
+- Pumps and heater decoded from measurements on a J235: `sensor.jacuzzi_pump_1` (Fra/Lav/Høj – byte 2 bits 3/4),
+  `binary_sensor.jacuzzi_pump_2` (byte 1 bit 2), `binary_sensor.jacuzzi_heater` "Varmelegeme" (byte 10 bit 6).
+  The old "circulation pump" was byte 1 bit 6, which just blinks (panel LED) – removed with the old pump_1 binary.
+- Climate: HVAC modes auto/heat/off, presets Eco/Klar/Vinter (state and commands on spa2mqtt/<id>/ha/..., owned by
+  Home Assistant automations), and hvac_action heating/idle from the heater bit.
+
 ## 1.0.3
 - The development override (/share/spa2mqtt_dev) now really takes effect (run from the code directory; `python -m` put /app first).
 

@@ -137,7 +137,11 @@ class HaMqttBridge:
     def publish_diagnostics(self, diag: dict):
         self.publish(self.t_diag, json.dumps(diag), retain=False, qos=0)
 
+    RETIRED = [("binary_sensor", "circulation_pump"), ("binary_sensor", "pump_1")]  # replaced in 1.0.4
+
     def publish_discovery(self):
+        for component, object_id in self.RETIRED:
+            self.publish(f"{self.prefix}/{component}/spa2mqtt_{self.device_id}/{object_id}/config", "", retain=True)
         for component, object_id, cfg in self._entities():
             cfg = {**cfg, "unique_id": f"spa2mqtt_{self.device_id}_{object_id}", "device": self.device,
                    "default_entity_id": f"{component}.jacuzzi_{object_id}"}
@@ -154,8 +158,15 @@ class HaMqttBridge:
                 "suggested_display_precision": 1}
         return [
             ("climate", "spa", {
-                "name": None, "icon": "mdi:hot-tub", "modes": ["heat"], "mode_state_topic": st,
-                "mode_state_template": "heat",
+                "name": None, "icon": "mdi:hot-tub",
+                # Mode and preset are owned by Home Assistant (input_select.jacuzzi_heating_mode); HA publishes their
+                # state to base/ha/... and handles the commands. The add-on only declares them.
+                "modes": ["auto", "heat", "off"],
+                "mode_state_topic": f"{self.base}/ha/hvac_mode", "mode_command_topic": f"{self.base}/ha/hvac_mode/set",
+                "preset_modes": ["Eco", "Klar", "Vinter"],
+                "preset_mode_state_topic": f"{self.base}/ha/preset",
+                "preset_mode_command_topic": f"{self.base}/ha/preset/set",
+                "action_topic": st, "action_template": "{{ 'heating' if value_json.heating else 'idle' }}",
                 "current_temperature_topic": st, "current_temperature_template": num("water_temperature"),
                 "temperature_state_topic": st, "temperature_state_template": num("setpoint_temperature"),
                 "temperature_command_topic": f"{self.base}/set/target_temperature",
@@ -170,20 +181,19 @@ class HaMqttBridge:
                                               "command_topic": f"{self.base}/set/target_temperature",
                                               "min": 18.5, "max": 40, "step": 0.5, "mode": "box",
                                               "unit_of_measurement": "°C", "icon": "mdi:thermometer"}),
-            ("binary_sensor", "circulation_pump", {"name": "Cirkulationspumpe", "state_topic": st,
-                                                   "value_template": onoff("circulation_pump"),
-                                                   "device_class": "running", "icon": "mdi:water-pump"}),
-            ("binary_sensor", "pump_1", {"name": "Pumpe 1", "state_topic": st, "value_template": onoff("pump_1"),
-                                         "device_class": "running", "icon": "mdi:pump"}),
+            ("sensor", "pump_1", {"name": "Pumpe 1", "state_topic": st, "value_template": "{{ value_json.pump_1 }}",
+                                  "device_class": "enum", "options": ["Fra", "Lav", "Høj"], "icon": "mdi:pump"}),
             ("binary_sensor", "pump_2", {"name": "Pumpe 2", "state_topic": st, "value_template": onoff("pump_2"),
                                          "device_class": "running", "icon": "mdi:pump"}),
+            ("binary_sensor", "heater", {"name": "Varmelegeme", "state_topic": st, "value_template": onoff("heating"),
+                                         "device_class": "power", "icon": "mdi:heat-wave"}),
             ("binary_sensor", "connected", {"name": "Forbindelse", "state_topic": self.t_link,
                                             "payload_on": "online", "payload_off": "offline",
                                             "device_class": "connectivity", "entity_category": "diagnostic",
                                             "availability": [{"topic": self.t_bridge}]}),
-            ("button", "pump_1", {"name": "Pumpe 1 (tryk)", "command_topic": f"{self.base}/set/press",
+            ("button", "pump_1", {"name": "Pumpe 1 (skift lav/høj)", "command_topic": f"{self.base}/set/press",
                                   "payload_press": "pump_1", "icon": "mdi:gesture-tap-button"}),
-            ("button", "pump_2", {"name": "Pumpe 2 (tryk)", "command_topic": f"{self.base}/set/press",
+            ("button", "pump_2", {"name": "Pumpe 2 (tænd/sluk)", "command_topic": f"{self.base}/set/press",
                                   "payload_press": "pump_2", "icon": "mdi:gesture-tap-button"}),
             ("button", "temperature_up", {"name": "Temperatur op", "command_topic": f"{self.base}/set/press",
                                           "payload_press": "temp_up", "icon": "mdi:thermometer-plus"}),

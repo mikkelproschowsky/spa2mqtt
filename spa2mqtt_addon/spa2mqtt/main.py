@@ -39,12 +39,13 @@ def load_variant(name: str) -> dict:
 
 
 def build_state(parsed: dict) -> dict:
+    pump_1 = "Høj" if parsed.get("pump_1_high") else ("Lav" if parsed.get("pump_1_low") else "Fra")
     return {
         "water_temperature": parsed.get("current_temperature"),
         "setpoint_temperature": parsed.get("setpoint_temperature"),
-        "circulation_pump": bool(parsed.get("circulation_pump_status")),
-        "pump_1": bool(parsed.get("main_pump_status")),
-        "pump_2": bool(parsed.get("secondary_pump_status")),
+        "pump_1": pump_1,
+        "pump_2": bool(parsed.get("pump_2")),
+        "heating": bool(parsed.get("heater")),
     }
 
 
