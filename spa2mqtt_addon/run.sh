@@ -1,4 +1,4 @@
-#!/usr/bin/env bashio
+#!/usr/bin/with-contenv bashio
 # Maps the add-on options and the Mosquitto service to the environment variables spa2mqtt reads.
 
 export SPA_IP="$(bashio::config 'spa_host')"

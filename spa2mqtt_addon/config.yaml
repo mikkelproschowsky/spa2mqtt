@@ -1,5 +1,5 @@
 name: Spa2MQTT (Jacuzzi)
-version: "1.0.0"
+version: "1.0.1"
 slug: spa2mqtt
 description: Jacuzzi spa (RS485 via an EW11A TCP gateway) in Home Assistant over MQTT – temperature, setpoint, pumps.
 url: https://github.com/mikkelproschowsky/spa2mqtt

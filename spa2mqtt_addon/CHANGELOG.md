@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.0.1
+- run.sh uses `with-contenv` (the base image runs s6; without it the script had no Supervisor token and could not read options or the MQTT service).
+
 ## 1.0.0
 - Home Assistant add-on packaging (Mosquitto credentials via the Supervisor; no external services).
 - New runtime: reconnects to the gateway forever (back-off, 30 s silence watchdog); MQTT availability (bridge + spa
