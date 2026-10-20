@@ -14,12 +14,17 @@ Builds upon SundanceRS485 as linked below from HyperactiveJ and those inspiring 
 
 ## Usage
 
-1. Create a config.yml in the repository root: `cp config.yml.example config.yml`
-2. Update the variables required in the config to get connected to your tub and MQTT.
-   3. You'll need to ensure you've set up the IP address and port of the tub's RS485 converter. If you're using the 
-      EW11A then your port is likely to be 8899, if you're using the prolink, I believe you can still connect 
-      but I haven't got one to test.
-3. docker-compose run -d .
+### As a Home Assistant add-on (recommended)
+Settings → Add-ons → Add-on Store → ⋮ → Repositories → add `https://github.com/mikkelproschowsky/spa2mqtt`, then
+install **Spa2MQTT (Jacuzzi)**, set the gateway IP and start it. It uses the Mosquitto broker add-on automatically.
+See [spa2mqtt_addon/DOCS.md](spa2mqtt_addon/DOCS.md).
+
+### Standalone (Docker)
+Copy `.env.example` to `.env`, fill in the gateway and MQTT broker, then `docker compose up -d --build`.
+
+### Tests
+`PYTHONPATH=spa2mqtt_addon python tests/test_runtime.py` (replays a captured J235 bus stream) and
+`PYTHONPATH=spa2mqtt_addon python dev/live_listen.py <gateway-ip> 30` (listen-only against a real spa).
 
 ## Issues
 If it doesn't work for your tub, i'd encourage you to open an issue with info. I'd love to make this work for a range

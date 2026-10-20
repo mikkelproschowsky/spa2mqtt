@@ -1,0 +1,28 @@
+name: Spa2MQTT (Jacuzzi)
+version: "1.0.0"
+slug: spa2mqtt
+description: Jacuzzi spa (RS485 via an EW11A TCP gateway) in Home Assistant over MQTT – temperature, setpoint, pumps.
+url: https://github.com/mikkelproschowsky/spa2mqtt
+arch:
+  - aarch64
+  - amd64
+  - armv7
+init: false
+startup: application
+boot: auto
+services:
+  - mqtt:need
+map:
+  - share:ro
+options:
+  spa_host: 192.168.0.141
+  spa_port: 8899
+  variant: jacuzzi_j235_encrypted
+  device_id: "185569045"
+  log_level: info
+schema:
+  spa_host: str
+  spa_port: port
+  variant: list(jacuzzi_j235_encrypted)
+  device_id: str
+  log_level: list(debug|info|warning|error)

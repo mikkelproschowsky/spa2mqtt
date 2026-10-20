@@ -1,23 +1,8 @@
-# Use a lightweight Python image
-FROM python:3.11-slim
-
-# Set environment variables
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1 \
-    PYTHONPATH=/app
-
-# Set workdir to root of the project
+# Standalone (non-Home-Assistant-add-on) image: docker compose up -d, with the variables from .env
+FROM python:3.12-slim
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PYTHONPATH=/app
 WORKDIR /app
-
-# Install system dependencies (if needed)
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    && apt-get clean && rm -rf /var/lib/apt/lists/*
-
-# Copy the project into the container
-COPY . /app
-
-# Install Python dependencies
+COPY spa2mqtt_addon/requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
-
-# Default command
-CMD ["python", "spa2mqtt/main.py"]
+COPY spa2mqtt_addon/spa2mqtt /app/spa2mqtt
+CMD ["python", "-m", "spa2mqtt.main"]
