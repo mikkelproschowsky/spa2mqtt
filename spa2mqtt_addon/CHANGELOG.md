@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.0.3
+- The development override (/share/spa2mqtt_dev) now really takes effect (run from the code directory; `python -m` put /app first).
+
 ## 1.0.2
 - Setpoint range 18.5–40 °C (the J235 does not go lower; measured).
 

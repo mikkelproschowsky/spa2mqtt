@@ -25,4 +25,6 @@ if [ -d /share/spa2mqtt_dev/spa2mqtt ]; then
 fi
 
 bashio::log.info "Starting spa2mqtt ${ADDON_VERSION} – gateway ${SPA_IP}:${SPA_PORT}, MQTT ${MQTT_HOST}:${MQTT_PORT}"
+# "python -m" puts the working directory first on sys.path, so run from the code directory we want
+cd "${PYTHONPATH}" || bashio::exit.nok "Code directory ${PYTHONPATH} missing"
 exec python3 -m spa2mqtt.main
