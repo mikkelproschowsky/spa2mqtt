@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.5
+- Lights: `binary_sensor.jacuzzi_light` "Lys" from the lights packet (0xCA, data[4] bit 7). Two light buttons (codes 241
+  and 242) with neutral names until their effect on the J235 panel is confirmed. Lights packet in diagnostics.
+
 ## 1.0.4
 - Pumps and heater decoded from measurements on a J235: `sensor.jacuzzi_pump_1` (Fra/Lav/Høj – byte 2 bits 3/4),
   `binary_sensor.jacuzzi_pump_2` (byte 1 bit 2), `binary_sensor.jacuzzi_heater` "Varmelegeme" (byte 10 bit 6).

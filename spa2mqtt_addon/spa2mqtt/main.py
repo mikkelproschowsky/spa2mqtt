@@ -22,7 +22,8 @@ VERSION = os.environ.get("ADDON_VERSION", "dev")
 STATUS_STALE_S = 30         # no status update for this long -> spa link "offline"
 HEARTBEAT_S = 60            # re-publish state at least this often
 DIAG_S = 30
-PRESS_MAP = {"pump_1": B.BTN_P1, "pump_2": B.BTN_P2, "temp_up": B.BTN_TEMP_UP, "temp_down": B.BTN_TEMP_DOWN}
+PRESS_MAP = {"pump_1": B.BTN_P1, "pump_2": B.BTN_P2, "temp_up": B.BTN_TEMP_UP, "temp_down": B.BTN_TEMP_DOWN,
+             "light": B.BTN_LIGHT_ON, "light_color": B.BTN_LIGHT_COLOR}
 
 log = logging.getLogger("spa2mqtt")
 
@@ -61,14 +62,24 @@ async def main():
     log.info("spa2mqtt %s starting (variant %s, gateway %s:%s)", VERSION, variant_name, env("SPA_IP"), env("SPA_PORT"))
 
     last_published = {"state": None, "at": 0.0}
+    lights: dict = {}
+    last_parsed: dict = {}
 
     def on_status(parsed: dict):
-        new = build_state(parsed)
+        last_parsed.clear()
+        last_parsed.update(parsed)
+        new = {**build_state(parsed), **lights}
         now = time.monotonic()
         if new != last_published["state"] or now - last_published["at"] >= HEARTBEAT_S:
             bridge.publish_state(new)
             last_published.update(state=new, at=now)
         bridge.set_link(True)
+
+    def on_lights(lt: dict):
+        if lt != lights:
+            lights.update(lt)
+            if last_parsed:
+                on_status(dict(last_parsed))
 
     def on_command_state(cs: dict):
         bridge.publish_diagnostics(diagnostics())
@@ -82,7 +93,7 @@ async def main():
     conn = SpaConnection(env("SPA_IP", "192.168.0.141"), env("SPA_PORT", 8899),
                          on_frame=lambda f: proto.handle_frame(f), on_link=on_link)
     proto = JacuzziProtocol(send=conn.send, message_configuration=variant.get("message_configuration", {}),
-                            on_status=on_status, on_command_state=on_command_state)
+                            on_status=on_status, on_command_state=on_command_state, on_lights=on_lights)
 
     async def on_command(name: str, payload: str):
         try:

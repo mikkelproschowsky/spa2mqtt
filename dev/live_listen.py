@@ -37,7 +37,14 @@ async def main():
             raws.setdefault(i, set()).add(b)
 
     proto = JacuzziProtocol(send=dry_send, message_configuration=cfg, on_status=on_status)
-    conn = SpaConnection(HOST, 8899, on_frame=proto.handle_frame)
+    orig = proto.handle_frame
+
+    async def handle(frame):  # also print changes of the lights packet (0xCA)
+        before = list(proto.raw_lights)
+        await orig(frame)
+        if proto.raw_lights != before:
+            print(time.strftime("%H:%M:%S"), "LIGHTS", " ".join(f"{b:02x}" for b in proto.raw_lights))
+    conn = SpaConnection(HOST, 8899, on_frame=handle)
     task = asyncio.create_task(conn.run_forever())
     await asyncio.sleep(SECONDS)
     task.cancel()

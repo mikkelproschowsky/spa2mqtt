@@ -33,11 +33,13 @@ SETPOINT_MIN, SETPOINT_MAX, SETPOINT_STEP = 18.5, 40.0, 0.5  # J235: measured 20
 
 class JacuzziProtocol:
     def __init__(self, send: Callable, message_configuration: dict, on_status: Callable[[dict], None],
-                 on_command_state: Callable[[dict], None] = lambda s: None, logger: logging.Logger = None):
+                 on_command_state: Callable[[dict], None] = lambda s: None,
+                 on_lights: Callable[[dict], None] = lambda s: None, logger: logging.Logger = None):
         self.send = send
         self.message_configuration = message_configuration
         self.on_status = on_status
         self.on_command_state = on_command_state
+        self.on_lights = on_lights
         self.logger = logger or logging.getLogger("spa2mqtt.protocol")
 
         self.channel: int | None = None
@@ -50,6 +52,7 @@ class JacuzziProtocol:
 
         self.status: dict = {}
         self.raw_status: list[int] = []
+        self.raw_lights: list[int] = []
         self.status_at: float | None = None
 
         # setpoint control
@@ -90,7 +93,8 @@ class JacuzziProtocol:
         return {"channel": self.channel, "cts_channels": sorted(self.cts_channels),
                 "panel_channels": sorted(self.active_channels), "queue": len(self.queue),
                 "target": self.target, "command_result": self.command_result,
-                "raw_status": " ".join(f"{b:02x}" for b in self.raw_status)}
+                "raw_status": " ".join(f"{b:02x}" for b in self.raw_status),
+                "raw_lights": " ".join(f"{b:02x}" for b in self.raw_lights)}
 
     # ---------- frame handling ----------
     async def handle_frame(self, frame: bytes):
@@ -120,6 +124,12 @@ class JacuzziProtocol:
                     mid=CLIENT_MID, channel=ch, packet_type=T.CHANNEL_ASSIGNMENT_ACK, body=bytearray()).raw)
                 self.channel = ch
                 self.want_new_channel = False
+        elif t in (T.LIGHTS_UPDATE, T.LIGHTS_UPDATE_ALT_23):
+            # Measured on a J235: data[4] bit 7 = lights on; data[2]/[6]/[8] = current colour (R/G/B, cycling);
+            # data[1] = a light mode/program code (0x64, 0x42, 0 when off) – meaning not confirmed yet.
+            self.raw_lights = list(pkt.data)
+            if len(self.raw_lights) > 4:
+                self.on_lights({"light": bool(self.raw_lights[4] & 0x80), "light_mode": self.raw_lights[1]})
         elif t == T.STATUS_UPDATE:
             msg = JacuzziEncryptedMessageFactory.from_packet(pkt, message_configuration=self.message_configuration)
             parsed = msg.parse()
