@@ -26,8 +26,10 @@ from spa2mqtt.spas.jacuzzi_encrypted.packet_types import JacuzziTopsideControlle
 
 CLIENT_MID = 0xBF
 DORMANT_CONFIDENCE = 40          # CC_REQ packets observed before picking a dormant channel
-PRESS_SETTLE_S = 4.0             # how long to wait for a press to show up in the status
-MAX_PRESSES_WITHOUT_EFFECT = 6
+PRESS_GAP_S = 0.35               # min time between presses in a burst (J235 accepts ~1 step/s whatever the gap)
+BURST_MAX = 10                   # max presses per burst (0.5 °C each)
+BATCH_SETTLE_S = 1.5             # after the last press: wait this long (and for a stable setpoint) before checking
+MAX_BATCHES_WITHOUT_EFFECT = 3   # bursts that did not move the setpoint at all before giving up
 SETPOINT_MIN, SETPOINT_MAX, SETPOINT_STEP = 18.5, 40.0, 0.5  # J235: measured 2026-10-20 (it stops at 18.5 °C)
 
 
@@ -48,43 +50,56 @@ class JacuzziProtocol:
         self.cc_seen = 0
         self.want_new_channel = False
         self.channel_requested_at = 0.0
-        self.queue: deque[bytes] = deque()
+        self.queue: deque[tuple[bytes, float]] = deque()  # (frame, not_before monotonic time)
+        self.last_sent_at = 0.0
 
         self.status: dict = {}
         self.raw_status: list[int] = []
         self.raw_lights: list[int] = []
         self.status_at: float | None = None
 
-        # setpoint control
+        # setpoint control (bursts of presses, verified against the status)
         self.target: float | None = None
-        self.press_sent_at: float | None = None
-        self.setpoint_at_press: float | None = None
-        self.presses_without_effect = 0
+        self.batch_active = False
+        self.batch_start_sp: float | None = None
+        self.batches_without_effect = 0
+        self.sp_changed_at = 0.0
         self.command_result = "idle"
 
     # ---------- public API ----------
     def reset_link(self):
         """Called after a reconnect: the bus state is unknown again."""
         self.queue.clear()
-        self.press_sent_at = None
+        self.batch_active = False
         self.cc_seen = 0
         self.active_channels.clear()
         self.cts_channels.clear()
         # keep self.channel – the board normally still polls it
 
-    def press(self, button: int):
+    def press(self, button: int, not_before: float = 0.0):
         a = random.randint(0, 255)
         body = bytearray([a, a ^ int(button)])
         pkt = JacuzziEncryptedPacket.construct_with_params(mid=CLIENT_MID, channel=self.channel or 0,
                                                             packet_type=T.CC_REQ, body=body)
-        self.queue.append(bytes(pkt.raw))
+        self.queue.append((bytes(pkt.raw), not_before))
+
+    def cancel(self):
+        """Stop an ongoing setpoint command (e.g. the user switched to manual)."""
+        if self.target is not None or self.queue:
+            self.logger.info("Setpoint command cancelled (target was %s)", self.target)
+        self.target = None
+        self.queue.clear()
+        self.batch_active = False
+        self.command_result = "cancelled"
+        self._publish_command_state()
 
     def set_target(self, value: float):
         v = round(float(value) * 2) / 2
         v = max(SETPOINT_MIN, min(SETPOINT_MAX, v))
         self.target = v
-        self.presses_without_effect = 0
-        self.press_sent_at = None
+        self.batches_without_effect = 0
+        self.queue.clear()
+        self.batch_active = False
         self.command_result = "running"
         self.logger.info("New target setpoint %.1f °C (current %s)", v, self.status.get("setpoint_temperature"))
         self._publish_command_state()
@@ -133,6 +148,8 @@ class JacuzziProtocol:
         elif t == T.STATUS_UPDATE:
             msg = JacuzziEncryptedMessageFactory.from_packet(pkt, message_configuration=self.message_configuration)
             parsed = msg.parse()
+            if parsed.get("setpoint_temperature") != self.status.get("setpoint_temperature"):
+                self.sp_changed_at = time.monotonic()
             self.raw_status = list(pkt.data)
             self.status = parsed
             self.status_at = time.monotonic()
@@ -164,49 +181,55 @@ class JacuzziProtocol:
     async def _on_our_cts(self):
         if not self.queue:
             return
-        raw = bytearray(self.queue.popleft())
+        now = time.monotonic()
+        if now < self.queue[0][1] or now - self.last_sent_at < PRESS_GAP_S:
+            return
+        raw = bytearray(self.queue.popleft()[0])
         if raw[2] != self.channel:  # queued before we had a channel: re-address and re-checksum
             raw[2] = self.channel
             raw[-2] = JacuzziEncryptedPacket.calculate_checksum(raw[1:-2])
         await self.send(bytes(raw))
-        if self.press_sent_at is not None:
-            self.press_sent_at = time.monotonic()  # settle time counts from the actual transmission
+        self.last_sent_at = now
 
     # ---------- setpoint closed loop ----------
     def _control_step(self):
+        """Bursts: press up to BURST_MAX times (never more than needed, so no overshoot), wait until the presses are
+        sent and the setpoint is stable, then re-evaluate. Missed presses (e.g. the display-wake press) are simply
+        made up in the next burst."""
         if self.target is None or self.channel is None:
             return
         sp = self.status.get("setpoint_temperature")
         if sp is None:
             return
         now = time.monotonic()
-        if abs(sp - self.target) < 0.01:
-            self.logger.info("Setpoint reached: %.1f °C", sp)
-            self.target = None
-            self.press_sent_at = None
-            self.command_result = "ok"
-            self._publish_command_state()
-            return
-        if self.press_sent_at is not None:
-            if sp != self.setpoint_at_press:
-                self.presses_without_effect = 0
-                self.press_sent_at = None
-            elif now - self.press_sent_at < PRESS_SETTLE_S:
-                return  # still waiting for the press to show up
-            else:
-                self.presses_without_effect += 1
-                self.press_sent_at = None
-                if self.presses_without_effect > MAX_PRESSES_WITHOUT_EFFECT:
-                    self.logger.error("Setpoint did not follow %d presses – giving up (target %.1f, setpoint %.1f)",
-                                      self.presses_without_effect, self.target, sp)
+        if self.batch_active:
+            if self.queue or now - self.last_sent_at < BATCH_SETTLE_S or now - self.sp_changed_at < BATCH_SETTLE_S:
+                return  # presses still going out, or the setpoint is still moving
+            self.batch_active = False
+            if sp == self.batch_start_sp:
+                self.batches_without_effect += 1
+                if self.batches_without_effect >= MAX_BATCHES_WITHOUT_EFFECT:
+                    self.logger.error("Setpoint did not follow %d bursts – giving up (target %.1f, setpoint %.1f)",
+                                      self.batches_without_effect, self.target, sp)
                     self.target = None
                     self.command_result = "failed"
                     self._publish_command_state()
                     return
-        if self.press_sent_at is None and not self.queue:
-            self.press(B.BTN_TEMP_UP if self.target > sp else B.BTN_TEMP_DOWN)
-            self.press_sent_at = now
-            self.setpoint_at_press = sp
+            else:
+                self.batches_without_effect = 0
+        if abs(sp - self.target) < 0.01:
+            self.logger.info("Setpoint reached: %.1f °C", sp)
+            self.target = None
+            self.command_result = "ok"
+            self._publish_command_state()
+            return
+        steps = min(BURST_MAX, int(round(abs(self.target - sp) / SETPOINT_STEP)))
+        button = B.BTN_TEMP_UP if self.target > sp else B.BTN_TEMP_DOWN
+        for i in range(max(1, steps)):
+            self.press(button, not_before=now + i * PRESS_GAP_S)
+        self.batch_active = True
+        self.batch_start_sp = sp
+        self.logger.debug("Burst of %d presses toward %.1f (setpoint %.1f)", max(1, steps), self.target, sp)
 
     def _publish_command_state(self):
         self.on_command_state({"target": self.target, "result": self.command_result})

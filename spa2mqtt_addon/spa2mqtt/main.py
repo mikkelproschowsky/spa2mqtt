@@ -99,6 +99,8 @@ async def main():
         try:
             if name == "target_temperature":
                 proto.set_target(float(payload))
+            elif name == "cancel":
+                proto.cancel()
             elif name == "press" and payload in PRESS_MAP:
                 if proto.channel is None:
                     log.warning("No bus channel yet – ignoring press %s", payload)

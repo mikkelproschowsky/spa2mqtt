@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.6
+- Setpoint changes in bursts (up to 10 presses, 0.35 s apart), then verified and topped up – never more presses than
+  needed, so no overshoot. The J235 itself takes ~1 step (0.5 °C) per second: 38.5 → 18.5 °C now ~40 s (was > 70 s).
+- New command `spa2mqtt/<id>/set/cancel` stops an ongoing setpoint change (Home Assistant sends it on "manual").
+
 ## 1.0.5
 - Lights: `binary_sensor.jacuzzi_light` "Lys" from the lights packet (0xCA, data[4] bit 7). Two light buttons (codes 241
   and 242) with neutral names until their effect on the J235 panel is confirmed. Lights packet in diagnostics.

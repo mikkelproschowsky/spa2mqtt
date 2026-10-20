@@ -27,9 +27,10 @@ show stale values.
 
 ## How setting the temperature works
 
-The spa has no "set temperature" message, so the add-on presses TEMP UP/DOWN on the bus one step (0.5 °C) at a time
-and checks each press against the spa's status. The first press may only wake the display. After 6 presses without
-effect it gives up (`bridge_status` = `failed`). Commands are only transmitted when the spa gives this client its
+The spa has no "set temperature" message, so the add-on presses TEMP UP/DOWN on the bus in bursts (up to 10 presses of
+0.5 °C, 0.35 s apart, never more than needed), waits until the setpoint is stable and tops up missed presses (the first
+press may only wake the display). The J235 takes about one step per second. After 3 bursts without any effect it gives
+up (`bridge_status` = `failed`). Publish anything to `spa2mqtt/<device_id>/set/cancel` to stop a change. Commands are only transmitted when the spa gives this client its
 turn (clear-to-send), so they don't collide with the topside panel.
 
 The add-on gets its own bus channel from the spa (new-client request), like an extra topside panel.

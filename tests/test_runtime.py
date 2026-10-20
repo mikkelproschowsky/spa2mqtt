@@ -55,13 +55,32 @@ def test_replay_capture_and_reconnect():
 
 
 class FakeProto(P.JacuzziProtocol):
-    def __init__(self):
+    """Drives the control loop without a bus: presses are 'sent' instantly; the fake spa applies them."""
+
+    def __init__(self, ignore_first=0, stuck=False):
         super().__init__(send=None, message_configuration={}, on_status=lambda s: None)
         self.channel = 0x11
+        self.sp = 38.5
+        self.ignore = ignore_first
+        self.stuck = stuck
+        self.sent = 0
+        P.PRESS_GAP_S = 0.0
+        P.BATCH_SETTLE_S = 0.0
 
-    def tick(self, setpoint):
-        self.status = {"setpoint_temperature": setpoint}
-        self._control_step()
+    def run(self, rounds=200):
+        for _ in range(rounds):
+            while self.queue:  # the bus sends everything; the spa reacts
+                btn = _decoded_button(self.queue.popleft()[0])
+                self.sent += 1
+                if self.ignore:
+                    self.ignore -= 1
+                elif not self.stuck:
+                    self.sp = max(18.5, min(40.0, self.sp + (0.5 if btn == P.B.BTN_TEMP_UP else -0.5)))
+            self.status = {"setpoint_temperature": self.sp}
+            self.sp_changed_at = 0.0
+            self._control_step()
+            if self.target is None:
+                return
 
 
 def _decoded_button(raw: bytes) -> int:
@@ -69,51 +88,36 @@ def _decoded_button(raw: bytes) -> int:
     return pkt.body[0] ^ pkt.body[1]
 
 
-def test_setpoint_loop_reaches_target():
+def test_setpoint_burst_reaches_target_without_overshoot():
     p = FakeProto()
-    p.set_target(37.6)  # rounds to 37.5
-    assert p.target == 37.5
-    sp = 38.5
-    for _ in range(50):
-        p.tick(sp)
-        if p.queue:
-            btn = _decoded_button(p.queue.popleft())
-            assert btn == P.B.BTN_TEMP_DOWN
-            sp -= 0.5  # the spa follows the press
-        if p.target is None:
-            break
-    assert sp == 37.5 and p.command_result == "ok"
+    p.set_target(18.4)  # rounds/clamps to 18.5
+    assert p.target == 18.5
+    p.run()
+    assert p.sp == 18.5 and p.command_result == "ok" and p.sent == 40  # exactly the needed presses
 
 
-def test_setpoint_loop_gives_up_without_effect():
-    p = FakeProto()
-    P.PRESS_SETTLE_S = 0.0
+def test_wake_press_is_made_up():
+    p = FakeProto(ignore_first=1)
+    p.set_target(37.0)
+    p.run()
+    assert p.sp == 37.0 and p.command_result == "ok" and p.sent == 4  # 3 needed + 1 ignored
+
+
+def test_gives_up_without_effect():
+    p = FakeProto(stuck=True)
     p.set_target(40)
-    for _ in range(100):
-        p.tick(38.0)
-        p.queue.clear()  # presses are sent but the spa never changes
-        if p.target is None:
-            break
-        time.sleep(0.001)
+    p.run()
     assert p.command_result == "failed"
 
 
-def test_first_press_may_only_wake_display():
+def test_cancel_stops_command():
     p = FakeProto()
-    P.PRESS_SETTLE_S = 0.0
-    p.set_target(39.0)
-    sp, presses = 38.5, 0
-    for _ in range(50):
-        p.tick(sp)
-        if p.queue:
-            p.queue.popleft()
-            presses += 1
-            if presses >= 2:
-                sp = 39.0  # first press ignored (display wake), second one changes the setpoint
-        if p.target is None:
-            break
-        time.sleep(0.001)
-    assert p.command_result == "ok" and presses == 2
+    p.set_target(20)
+    p.status = {"setpoint_temperature": p.sp}
+    p._control_step()
+    assert p.queue
+    p.cancel()
+    assert not p.queue and p.target is None and p.command_result == "cancelled"
 
 
 if __name__ == "__main__":
