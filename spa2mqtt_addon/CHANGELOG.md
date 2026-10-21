@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.7
+- Climate target temperature comes from / goes to Home Assistant (`spa2mqtt/<id>/ha/target`, `.../ha/target/set`): the
+  card shows what the user wants (e.g. 38.5 °C) while HA may hold the spa's technical setpoint lower in expensive hours.
+  The spa setpoint stays available as `sensor.jacuzzi_target_temperature` "Sætpunkt (teknisk)" and
+  `number.jacuzzi_target_temperature` "Sætpunkt (direkte)".
+- Preset "Aften" (daily evening window, logic in Home Assistant).
+
 ## 1.0.6
 - Setpoint changes in bursts (up to 10 presses, 0.35 s apart), then verified and topped up – never more presses than
   needed, so no overshoot. The J235 itself takes ~1 step (0.5 °C) per second: 38.5 → 18.5 °C now ~40 s (was > 70 s).
